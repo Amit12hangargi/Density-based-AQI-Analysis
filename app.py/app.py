@@ -9,6 +9,7 @@ from sklearn.cluster import DBSCAN, OPTICS
 from sklearn.decomposition import PCA
 import hdbscan
 
+
 # --------------------------------------------------
 # Page Configuration & Header
 # --------------------------------------------------
@@ -182,8 +183,12 @@ st.markdown("---")
 # --------------------------------------------------
 st.markdown("## HDBSCAN Clustering")
 
-hdb = hdbscan.HDBSCAN(min_cluster_size=50, min_samples=10)
-clusters_hdb = hdb.fit_predict(X_scaled)
+hdbscan_model = hdbscan.HDBSCAN(
+    min_cluster_size=15,
+    min_samples=10
+)
+
+clusters_hdb = hdbscan_model.fit_predict(X_scaled)
 
 st.write("Cluster Distribution:")
 st.write(pd.Series(clusters_hdb).value_counts())
@@ -193,15 +198,56 @@ pca_df_hdb["Cluster"] = clusters_hdb
 
 fig, ax = plt.subplots(figsize=(8, 5))
 sns.scatterplot(
-    data=pca_df_hdb, x="PC1", y="PC2",
-    hue="Cluster", palette="tab10", s=40, ax=ax
+    data=pca_df_hdb,
+    x="PC1",
+    y="PC2",
+    hue="Cluster",
+    palette="Set2",
+    s=40,
+    ax=ax
 )
 ax.set_title("HDBSCAN Clusters (PCA Projection)")
 plt.tight_layout()
 st.pyplot(fig)
 
 st.markdown("""
-**Observation:** HDBSCAN adapts to varying pollution densities and automatically identifies stable AQI patterns.
+**Observation:** HDBSCAN adapts to variable-density AQI patterns
+and separates dense pollution zones from transitional regions.
+""")
+
+st.markdown("---")
+
+# --------------------------------------------------
+# Cluster-wise Pollution Profile (HDBSCAN)
+# --------------------------------------------------
+st.markdown("## Cluster-wise Pollution Profile (HDBSCAN)")
+
+hdb_profile_df = features.copy()
+hdb_profile_df["Cluster"] = clusters_hdb   # ✅ FIXED
+
+hdb_profile = hdb_profile_df.groupby("Cluster").mean().reset_index()
+st.dataframe(hdb_profile)
+
+selected_hdb_cluster = st.selectbox(
+    "Select HDBSCAN Cluster",
+    hdb_profile["Cluster"],
+    key="hdb_cluster_select"
+)
+
+hdb_cluster_data = hdb_profile[
+    hdb_profile["Cluster"] == selected_hdb_cluster
+].drop(columns=["Cluster"])
+
+fig, ax = plt.subplots(figsize=(9, 4))
+hdb_cluster_data.T.plot(kind="bar", legend=False, ax=ax)
+ax.set_title(f"HDBSCAN Pollution Profile – Cluster {selected_hdb_cluster}")
+ax.set_ylabel("Average Value")
+plt.tight_layout()
+st.pyplot(fig)
+
+st.markdown("""
+**Observation:** HDBSCAN cluster profiles reveal adaptive pollution regimes,
+capturing both dense hotspots and transitional AQI behavior.
 """)
 
 st.markdown("---")
@@ -211,8 +257,13 @@ st.markdown("---")
 # --------------------------------------------------
 st.markdown("## OPTICS Clustering")
 
-optics = OPTICS(min_samples=10, xi=0.05, min_cluster_size=0.05)
-clusters_opt = optics.fit_predict(X_scaled)
+optics_model = OPTICS(
+    min_samples=10,
+    xi=0.05,
+    min_cluster_size=0.05
+)
+
+clusters_opt = optics_model.fit_predict(X_scaled)
 
 st.write("Cluster Distribution:")
 st.write(pd.Series(clusters_opt).value_counts())
@@ -222,19 +273,59 @@ pca_df_opt["Cluster"] = clusters_opt
 
 fig, ax = plt.subplots(figsize=(8, 5))
 sns.scatterplot(
-    data=pca_df_opt, x="PC1", y="PC2",
-    hue="Cluster", palette="Set1", s=40, ax=ax
+    data=pca_df_opt,
+    x="PC1",
+    y="PC2",
+    hue="Cluster",
+    palette="Set3",
+    s=40,
+    ax=ax
 )
 ax.set_title("OPTICS Clusters (PCA Projection)")
 plt.tight_layout()
 st.pyplot(fig)
 
 st.markdown("""
-**Observation:** OPTICS reveals hierarchical density transitions, capturing gradual changes in AQI patterns.
+**Observation:** OPTICS captures hierarchical density variations
+and identifies gradual transitions between AQI regimes.
 """)
 
 st.markdown("---")
 
+# --------------------------------------------------
+# Cluster-wise Pollution Profile (OPTICS)
+# --------------------------------------------------
+st.markdown("## Cluster-wise Pollution Profile (OPTICS)")
+
+opt_profile_df = features.copy()
+opt_profile_df["Cluster"] = clusters_opt   # ✅ CORRECT VARIABLE
+
+opt_profile = opt_profile_df.groupby("Cluster").mean().reset_index()
+st.dataframe(opt_profile)
+
+selected_opt_cluster = st.selectbox(
+    "Select OPTICS Cluster",
+    opt_profile["Cluster"],
+    key="opt_cluster_select"
+)
+
+opt_cluster_data = opt_profile[
+    opt_profile["Cluster"] == selected_opt_cluster
+].drop(columns=["Cluster"])
+
+fig, ax = plt.subplots(figsize=(9, 4))
+opt_cluster_data.T.plot(kind="bar", legend=False, ax=ax)
+ax.set_title(f"OPTICS Pollution Profile – Cluster {selected_opt_cluster}")
+ax.set_ylabel("Average Value")
+plt.tight_layout()
+st.pyplot(fig)
+
+st.markdown("""
+**Observation:** OPTICS cluster profiles expose gradual pollution
+intensity changes and transitional AQI behavior across clusters.
+""")
+
+st.markdown("---")
 # --------------------------------------------------
 # Algorithm Comparison
 # --------------------------------------------------
@@ -266,30 +357,61 @@ st.pyplot(fig)
 st.markdown("""
 **Key Insight:** HDBSCAN and OPTICS handle variable-density AQI patterns more robustly compared to DBSCAN.
 """)
-st.subheader("Respiratory Health Risk Association (Derived Analysis)")
 
-st.markdown("""
-This section presents a **derived respiratory health risk association**
-based on air pollutant concentrations.
+# --------------------------------------------------
+# Respiratory Health Risk Drivers (Visual & Insightful)
+# --------------------------------------------------
+st.markdown("## 🫁 Respiratory Health Risk Drivers")
 
-⚠️ **Note:** This is **not a medical diagnosis**.  
-The analysis provides a **relative risk interpretation** using
-pollutants known to impact respiratory health.
-""")
+pollutants = ["PM2.5", "PM10", "NO2", "SO2", "O3"]
 
-st.markdown("""
-#### Pollutants Associated with Respiratory Health Risk
+def respiratory_risk_section(title, cluster_labels, key_prefix):
+    st.markdown(f"### {title}")
 
-- **PM2.5 & PM10** → Asthma, bronchitis, reduced lung function  
-- **NO₂** → Airway inflammation, asthma aggravation  
-- **SO₂** → Bronchoconstriction, respiratory irritation  
-- **O₃** → Reduced lung capacity, chest pain, coughing  
+    rhi_df = features[pollutants].copy()
+    rhi_df["Cluster"] = cluster_labels
 
-Higher combined concentrations increase **respiratory health risk severity**.
-""")
+    selected_cluster = st.selectbox(
+        f"Select {title} Cluster",
+        sorted(rhi_df["Cluster"].unique()),
+        key=key_prefix
+    )
 
-st.success("""
-✅ This project demonstrates how **density-based clustering**
-can uncover pollution patterns and their **potential respiratory health implications**
-using real-world Indian AQI data.
-""")
+    cluster_means = (
+        rhi_df[rhi_df["Cluster"] == selected_cluster]
+        .mean()
+    )
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    cluster_means.plot(kind="bar", ax=ax)
+    ax.set_ylabel("Relative Concentration")
+    ax.set_title(f"Respiratory Risk Drivers – {title} Cluster {selected_cluster}")
+    plt.xticks(rotation=0)
+    plt.tight_layout()
+    st.pyplot(fig)
+
+    dominant_pollutant = cluster_means.idxmax()
+    st.success(
+        f"🔎 **Key Insight:** Respiratory risk in this cluster is primarily driven by **{dominant_pollutant}**."
+    )
+
+    st.markdown("---")
+
+
+respiratory_risk_section(
+    title="DBSCAN",
+    cluster_labels=clusters_db,
+    key_prefix="dbscan_rhi"
+)
+
+respiratory_risk_section(
+    title="HDBSCAN",
+    cluster_labels=clusters_hdb,
+    key_prefix="hdbscan_rhi"
+)
+
+respiratory_risk_section(
+    title="OPTICS",
+    cluster_labels=clusters_opt,
+    key_prefix="optics_rhi"
+)
