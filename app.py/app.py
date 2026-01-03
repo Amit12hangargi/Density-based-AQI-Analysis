@@ -266,3 +266,30 @@ st.pyplot(fig)
 st.markdown("""
 **Key Insight:** HDBSCAN and OPTICS handle variable-density AQI patterns more robustly compared to DBSCAN.
 """)
+st.subheader("Respiratory Health Risk Association (Derived Analysis)")
+
+st.markdown("""
+This section presents a **derived respiratory health risk association**
+based on air pollutant concentrations.
+
+⚠️ **Note:** This is **not a medical diagnosis**.  
+The analysis provides a **relative risk interpretation** using
+pollutants known to impact respiratory health.
+""")
+
+st.markdown("""
+#### Pollutants Associated with Respiratory Health Risk
+
+- **PM2.5 & PM10** → Asthma, bronchitis, reduced lung function  
+- **NO₂** → Airway inflammation, asthma aggravation  
+- **SO₂** → Bronchoconstriction, respiratory irritation  
+- **O₃** → Reduced lung capacity, chest pain, coughing  
+
+Higher combined concentrations increase **respiratory health risk severity**.
+""")
+
+st.success("""
+✅ This project demonstrates how **density-based clustering**
+can uncover pollution patterns and their **potential respiratory health implications**
+using real-world Indian AQI data.
+""")
